@@ -1,0 +1,181 @@
+# Simple VPC for hospital system
+
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = "us-east-1"
+}
+
+# Create VPC
+resource "aws_vpc" "main" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  tags = {
+    Name = "hospital-vpc"
+  }
+}
+
+# App subnet
+resource "aws_subnet" "app" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.1.0/24"
+  availability_zone = "us-east-1a"
+
+  tags = {
+    Name = "app-subnet"
+  }
+}
+
+# Database subnet
+resource "aws_subnet" "database" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = "us-east-1a"
+
+  tags = {
+    Name = "database-subnet"
+  }
+}
+
+# Internet gateway
+resource "aws_internet_gateway" "main" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "hospital-igw"
+  }
+}
+
+# Outputs
+output "vpc_id" {
+  value = aws_vpc.main.id
+}
+
+# Security group for app server
+resource "aws_security_group" "app" {
+  name        = "hospital-app-sg"
+  description = "Allow HTTP and SSH"
+  vpc_id      = aws_vpc.main.id
+
+  # Allow SSH from anywhere (we'll restrict this later)
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = var.allowed_ip_ranges
+  }
+
+  # Allow HTTP
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Allow all outbound traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "app-security-group"
+  }
+}
+
+# Security group for database
+resource "aws_security_group" "database" {
+  name        = "hospital-db-sg"
+  description = "Allow access only from app server"
+  vpc_id      = aws_vpc.main.id
+
+  # Only allow database traffic from app subnet
+  ingress {
+    from_port   = 5432  # PostgreSQL port
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.1.0/24"]  # Only from app subnet
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "database-security-group"
+  }
+}
+
+# Output the security group IDs
+output "app_sg_id" {
+  value = aws_security_group.app.id
+}
+
+output "db_sg_id" {
+  value = aws_security_group.database.id
+}
+
+# Get the latest Amazon Linux 2023 AMI
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-*-x86_64"]
+  }
+}
+
+# Create app server
+resource "aws_instance" "app" {
+  ami                    = data.aws_ami.amazon_linux.id
+  instance_type          = "t3.micro"
+  key_name               = "hospital-app-key"
+  subnet_id              = aws_subnet.app.id
+  vpc_security_group_ids = [aws_security_group.app.id]
+  
+  associate_public_ip_address = true
+
+  tags = {
+    Name = "hospital-app-server"
+  }
+}
+
+output "app_server_ip" {
+  value = aws_instance.app.public_ip
+}
+
+# Route table for app subnet
+resource "aws_route_table" "app" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.main.id
+  }
+
+  tags = {
+    Name = "app-route-table"
+  }
+}
+
+# Associate route table with app subnet
+resource "aws_route_table_association" "app" {
+  subnet_id      = aws_subnet.app.id
+  route_table_id = aws_route_table.app.id
+}
