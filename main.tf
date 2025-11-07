@@ -179,3 +179,35 @@ resource "aws_route_table_association" "app" {
   subnet_id      = aws_subnet.app.id
   route_table_id = aws_route_table.app.id
 }
+
+# Database instance
+resource "aws_instance" "database" {
+  ami                    = data.aws_ami.amazon_linux.id
+  instance_type          = "t3.micro"
+  subnet_id              = aws_subnet.database.id
+  vpc_security_group_ids = [aws_security_group.database.id]
+  key_name               = "hospital-app-key"
+  
+  # No public IP - database stays private
+  associate_public_ip_address = false
+
+  user_data = <<-EOF
+    #!/bin/bash
+    yum update -y
+    amazon-linux-extras install postgresql14 -y
+    yum install postgresql-server -y
+    postgresql-setup --initdb
+    systemctl start postgresql
+    systemctl enable postgresql
+  EOF
+
+  tags = {
+    Name     = "hospital-database"
+    Type     = "Database"
+    Hospital = var.hospital_name
+  }
+}
+
+output "database_private_ip" {
+  value = aws_instance.database.private_ip
+}
