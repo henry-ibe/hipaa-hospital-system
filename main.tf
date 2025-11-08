@@ -77,7 +77,7 @@ resource "aws_security_group" "app" {
   # Allow HTTP
   ingress {
     from_port   = 80
-    to_port     = 80
+    to_port     = 8000
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -210,4 +210,198 @@ resource "aws_instance" "database" {
 
 output "database_private_ip" {
   value = aws_instance.database.private_ip
+}
+
+# Application Load Balancer
+resource "aws_lb" "app" {
+  name               = "hospital-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = [aws_subnet.app.id, aws_subnet.public.id]  # Need 2 subnets minimum
+
+  tags = {
+    Name = "hospital-alb"
+  }
+}
+
+# Security group for ALB
+resource "aws_security_group" "alb" {
+  name        = "hospital-alb-sg"
+  description = "Allow HTTPS from anywhere"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 80
+    to_port     = 8000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "alb-sg"
+  }
+}
+
+# Target group for app server
+resource "aws_lb_target_group" "app" {
+  name     = "hospital-app-tg"
+  port     = 8000
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+
+  health_check {
+    path = "/"
+    port = 8000
+  }
+}
+
+# Attach app server to target group
+resource "aws_lb_target_group_attachment" "app" {
+  target_group_arn = aws_lb_target_group.app.arn
+  target_id        = aws_instance.app.id
+  port             = 80
+}
+
+# ALB listener
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.app.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app.arn
+  }
+}
+
+output "alb_dns" {
+  value = aws_lb.app.dns_name
+}
+
+# Add public subnet in different AZ for ALB
+resource "aws_subnet" "public" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.3.0/24"
+  availability_zone = "us-east-1b"
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "public-subnet-1b"
+  }
+}
+
+# Associate with route table
+resource "aws_route_table_association" "public" {
+  subnet_id      = aws_subnet.public.id
+  route_table_id = aws_route_table.app.id
+}
+
+# WAF for geo-restriction
+resource "aws_wafv2_web_acl" "main" {
+  name  = "hospital-waf"
+  scope = "CLOUDFRONT"
+
+  default_action {
+    block {}
+  }
+
+  # Rule 1: Allow only from allowed IPs
+  rule {
+    name     = "AllowHospitalIPs"
+    priority = 1
+
+    action {
+      allow {}
+    }
+
+    statement {
+      ip_set_reference_statement {
+        arn = aws_wafv2_ip_set.hospital_ips.arn
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "AllowHospitalIPs"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "HospitalWAF"
+    sampled_requests_enabled   = true
+  }
+}
+
+# IP set for allowed hospital IPs
+resource "aws_wafv2_ip_set" "hospital_ips" {
+  name               = "hospital-allowed-ips"
+  scope              = "CLOUDFRONT"
+  ip_address_version = "IPV4"
+  addresses          = var.allowed_ip_ranges
+}
+
+# CloudFront distribution
+resource "aws_cloudfront_distribution" "main" {
+  enabled = true
+  
+  origin {
+    domain_name = aws_lb.app.dns_name
+    origin_id   = "hospital-alb"
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "http-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+
+  default_cache_behavior {
+    target_origin_id       = "hospital-alb"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+    cached_methods         = ["GET", "HEAD"]
+
+    forwarded_values {
+      query_string = true
+      cookies {
+        forward = "all"
+      }
+    }
+  }
+
+  # Geo restriction: US only
+  restrictions {
+    geo_restriction {
+      restriction_type = "whitelist"
+      locations        = ["US"]
+    }
+  }
+
+  viewer_certificate {
+    cloudfront_default_certificate = true
+  }
+
+  web_acl_id = aws_wafv2_web_acl.main.arn
+}
+
+output "cloudfront_url" {
+  value = aws_cloudfront_distribution.main.domain_name
 }
