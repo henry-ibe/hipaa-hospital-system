@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mount Sinai Hospital - Home</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+        
+        .hero h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .hero p {
+            font-size: 1.25rem;
+            margin-bottom: 2rem;
+        }
+        
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            padding: 3rem 0;
+        }
+        
+        .service-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.3s;
+        }
+        
+        .service-card:hover {
+            transform: translateY(-10px);
+        }
+        
+        .service-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <div class="container">
+            <div class="hospital-icon">🏥</div>
+            <h1>Mount Sinai Hospital</h1>
+            <p>Excellence in Healthcare Since 1852</p>
+            <a href="/login" class="btn btn-primary" style="font-size: 1.25rem; padding: 1rem 2rem;">
+                Staff Login →
+            </a>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h2 style="text-align: center; margin: 3rem 0 2rem;">Our Services</h2>
+        
+        <div class="services-grid">
+            <div class="service-card">
+                <div class="service-icon">❤️</div>
+                <h3>Cardiology</h3>
+                <p>Advanced heart care with state-of-the-art technology and expert cardiologists.</p>
+            </div>
+            
+            <div class="service-card">
+                <div class="service-icon">🧠</div>
+                <h3>Neurology</h3>
+                <p>Comprehensive neurological care for brain and nervous system disorders.</p>
+            </div>
+            
+            <div class="service-card">
+                <div class="service-icon">🦴</div>
+                <h3>Orthopedics</h3>
+                <p>Expert treatment for bone, joint, and muscle conditions.</p>
+            </div>
+            
+            <div class="service-card">
+                <div class="service-icon">👶</div>
+                <h3>Pediatrics</h3>
+                <p>Specialized care for infants, children, and adolescents.</p>
+            </div>
+            
+            <div class="service-card">
+                <div class="service-icon">🔬</div>
+                <h3>Laboratory</h3>
+                <p>Advanced diagnostic testing with rapid turnaround times.</p>
+            </div>
+            
+            <div class="service-card">
+                <div class="service-icon">🚑</div>
+                <h3>Emergency Care</h3>
+                <p>24/7 emergency services with immediate response teams.</p>
+            </div>
+        </div>
+        
+        <div class="card" style="margin-top: 3rem;">
+            <div class="card-header">
+                <span>📍 Location</span>
+            </div>
+            <div class="card-body">
+                <p><strong>Address:</strong> 1468 Madison Avenue, New York, NY 10029</p>
+                <p><strong>Phone:</strong> (212) 241-6500</p>
+                <p><strong>Emergency:</strong> 911 or (212) 241-7171</p>
+            </div>
+        </div>
+    </div>
+    
+    <footer style="background: #2c3e50; color: white; padding: 2rem; text-align: center; margin-top: 4rem;">
+        <p>&copy; 2025 Mount Sinai Hospital. All rights reserved.</p>
+        <p>Geo-Restricted Access • Multi-Factor Authentication • HIPAA Compliant</p>
+    </footer>
+</body>
+</html>

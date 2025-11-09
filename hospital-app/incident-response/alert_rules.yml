@@ -1,0 +1,32 @@
+# Incident Response Alert Rules
+alerts:
+  failed_login_threshold:
+    name: "Excessive Failed Logins"
+    threshold: 5
+    window_minutes: 5
+    action: "lock_account"
+    severity: "critical"
+  
+  geo_violation:
+    name: "Unauthorized Geographic Access"
+    allowed_states: ["NY"]
+    action: "block_ip"
+    severity: "high"
+  
+  mfa_brute_force:
+    name: "MFA Brute Force Attempt"
+    threshold: 10
+    window_minutes: 5
+    action: "block_ip"
+    severity: "critical"
+
+actions:
+  lock_account:
+    enabled: true
+    duration_minutes: 30
+    notify_admin: true
+  
+  block_ip:
+    enabled: true
+    duration_minutes: 60
+    notify_admin: true

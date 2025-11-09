@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor Dashboard - Mount Sinai Hospital</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .stat-icon {
+            font-size: 3rem;
+            width: 70px;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+        
+        .data-table thead {
+            background: #2c3e50;
+            color: white;
+        }
+        
+        .data-table th,
+        .data-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .data-table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 0.35rem 0.65rem;
+            font-size: 0.85rem;
+            font-weight: bold;
+            border-radius: 20px;
+        }
+        
+        .badge.critical { background: #dc3545; color: white; }
+        .badge.stable { background: #28a745; color: white; }
+        .badge.moderate { background: #ffc107; color: #333; }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <div class="navbar">
+        <div class="navbar-brand">
+            <span>🏥</span>
+            <span>Mount Sinai Hospital</span>
+        </div>
+        <div class="navbar-user">
+            <div class="user-info">
+                <div class="user-name" id="user-name">Loading...</div>
+                <div class="user-role">👨‍⚕️ Doctor</div>
+            </div>
+            <button class="btn-logout" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1 style="margin-bottom: 2rem;">👨‍⚕️ Doctor Dashboard</h1>
+        
+        <!-- Stats Overview -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-content">
+                    <h3 id="total-patients">0</h3>
+                    <p>My Patients</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">📋</div>
+                <div class="stat-content">
+                    <h3>3</h3>
+                    <p>Today's Appointments</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">🔬</div>
+                <div class="stat-content">
+                    <h3>4</h3>
+                    <p>Pending Lab Results</p>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon">💊</div>
+                <div class="stat-content">
+                    <h3>8</h3>
+                    <p>Prescriptions Today</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Patient List -->
+        <div class="card">
+            <div class="card-header">
+                <span>👥 My Patients</span>
+                <input type="text" id="search" placeholder="Search patients..." style="padding: 0.5rem; border: 1px solid #dee2e6; border-radius: 5px;">
+            </div>
+            <div class="card-body">
+                <table class="data-table" id="patients-table">
+                    <thead>
+                        <tr>
+                            <th>Patient ID</th>
+                            <th>Name</th>
+                            <th>Age</th>
+                            <th>Condition</th>
+                            <th>Room</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="patients-tbody">
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 2rem;">
+                                <div class="spinner"></div>
+                                Loading patients...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Patient Details Modal -->
+        <div id="patient-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modal-patient-name">Patient Details</h2>
+                    <span class="modal-close" onclick="closeModal()">&times;</span>
+                </div>
+                <div id="modal-body">
+                    <!-- Patient details will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check authentication
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login';
+        }
+
+        // Set user info
+        document.getElementById('user-name').textContent = localStorage.getItem('name') || 'Doctor';
+
+        // Load patients
+        async function loadPatients() {
+            try {
+                const response = await fetch('/api/doctor/patients', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                const data = await response.json();
+                const patients = data.patients;
+                
+                document.getElementById('total-patients').textContent = patients.length;
+                
+                const tbody = document.getElementById('patients-tbody');
+                tbody.innerHTML = patients.map(p => `
+                    <tr>
+                        <td><strong>${p.id}</strong></td>
+                        <td>${p.name}</td>
+                        <td>${p.age}</td>
+                        <td>${p.condition}</td>
+                        <td>${p.room}</td>
+                        <td><span class="badge ${getStatusClass(p.condition)}">${getStatus(p.condition)}</span></td>
+                        <td>
+                            <button class="btn btn-primary btn-sm" onclick='viewPatient(${JSON.stringify(p)})'>
+                                View Details
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading patients:', error);
+            }
+        }
+
+        function getStatusClass(condition) {
+            if (condition.includes('Post-Surgery') || condition.includes('Pneumonia')) return 'critical';
+            if (condition.includes('Diabetes') || condition.includes('Hypertension')) return 'moderate';
+            return 'stable';
+        }
+
+        function getStatus(condition) {
+            if (condition.includes('Post-Surgery') || condition.includes('Pneumonia')) return 'Critical';
+            if (condition.includes('Diabetes') || condition.includes('Hypertension')) return 'Moderate';
+            return 'Stable';
+        }
+
+        function viewPatient(patient) {
+            const modal = document.getElementById('patient-modal');
+            document.getElementById('modal-patient-name').textContent = patient.name;
+            
+            document.getElementById('modal-body').innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    <div>
+                        <h3>Patient Information</h3>
+                        <p><strong>ID:</strong> ${patient.id}</p>
+                        <p><strong>Age:</strong> ${patient.age} years</p>
+                        <p><strong>Gender:</strong> ${patient.gender}</p>
+                        <p><strong>Blood Type:</strong> ${patient.blood_type}</p>
+                        <p><strong>Room:</strong> ${patient.room}</p>
+                        <p><strong>Admitted:</strong> ${patient.admitted}</p>
+                    </div>
+                    
+                    <div>
+                        <h3>Vital Signs</h3>
+                        <p><strong>Blood Pressure:</strong> ${patient.vitals.bp} mmHg</p>
+                        <p><strong>Heart Rate:</strong> ${patient.vitals.heart_rate} bpm</p>
+                        <p><strong>Temperature:</strong> ${patient.vitals.temp}°F</p>
+                        <p><strong>Oxygen:</strong> ${patient.vitals.oxygen}%</p>
+                    </div>
+                    
+                    <div>
+                        <h3>Medications</h3>
+                        <ul>
+                            ${patient.medications.map(m => `<li>${m}</li>`).join('')}
+                        </ul>
+                    </div>
+                    
+                    <div>
+                        <h3>Allergies</h3>
+                        <p style="color: #dc3545; font-weight: bold;">${patient.allergies.join(', ')}</p>
+                        
+                        <h3 style="margin-top: 1rem;">Insurance</h3>
+                        <p>${patient.insurance}</p>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 2rem;">
+                    <h3>Quick Actions</h3>
+                    <button class="btn btn-primary" style="margin-right: 0.5rem;">
+                        💊 Prescribe Medication
+                    </button>
+                    <button class="btn btn-success" style="margin-right: 0.5rem;">
+                        📋 Order Lab Test
+                    </button>
+                    <button class="btn" style="background: #6c757d; color: white;">
+                        📝 Add Notes
+                    </button>
+                </div>
+            `;
+            
+            modal.style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('patient-modal').style.display = 'none';
+        }
+
+        // Search functionality
+        document.getElementById('search').addEventListener('input', (e) => {
+            const search = e.target.value.toLowerCase();
+            const rows = document.querySelectorAll('#patients-tbody tr');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(search) ? '' : 'none';
+            });
+        });
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = '/login';
+        }
+
+        // Load data on page load
+        loadPatients();
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('patient-modal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html>
