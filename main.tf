@@ -66,7 +66,14 @@ resource "aws_security_group" "app" {
   description = "Allow HTTP and SSH"
   vpc_id      = aws_vpc.main.id
 
-  # Allow SSH from anywhere (we'll restrict this later)
+  ingress {
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Grafana UI" 
+  } 
+
   ingress {
     from_port   = 22
     to_port     = 22
@@ -74,7 +81,6 @@ resource "aws_security_group" "app" {
     cidr_blocks = var.allowed_ip_ranges
   }
 
-  # Allow HTTP
   ingress {
     from_port   = 80
     to_port     = 8000
@@ -82,7 +88,6 @@ resource "aws_security_group" "app" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Allow all outbound traffic
   egress {
     from_port   = 0
     to_port     = 0
@@ -101,12 +106,11 @@ resource "aws_security_group" "database" {
   description = "Allow access only from app server"
   vpc_id      = aws_vpc.main.id
 
-  # Only allow database traffic from app subnet
   ingress {
-    from_port   = 5432  # PostgreSQL port
+    from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    cidr_blocks = ["10.0.1.0/24"]  # Only from app subnet
+    cidr_blocks = ["10.0.1.0/24"]
   }
 
   egress {
@@ -121,7 +125,6 @@ resource "aws_security_group" "database" {
   }
 }
 
-# Output the security group IDs
 output "app_sg_id" {
   value = aws_security_group.app.id
 }
@@ -141,15 +144,21 @@ data "aws_ami" "amazon_linux" {
   }
 }
 
-# Create app server
+# Create app server with 16 GiB volume
 resource "aws_instance" "app" {
   ami                    = data.aws_ami.amazon_linux.id
   instance_type          = "t3.micro"
   key_name               = "hospital-app-key"
   subnet_id              = aws_subnet.app.id
   vpc_security_group_ids = [aws_security_group.app.id]
-  
+
   associate_public_ip_address = true
+
+  root_block_device {
+    volume_size           = 16
+    volume_type           = "gp3"
+    delete_on_termination = true
+  }
 
   tags = {
     Name = "hospital-app-server"
@@ -174,7 +183,6 @@ resource "aws_route_table" "app" {
   }
 }
 
-# Associate route table with app subnet
 resource "aws_route_table_association" "app" {
   subnet_id      = aws_subnet.app.id
   route_table_id = aws_route_table.app.id
@@ -187,8 +195,6 @@ resource "aws_instance" "database" {
   subnet_id              = aws_subnet.database.id
   vpc_security_group_ids = [aws_security_group.database.id]
   key_name               = "hospital-app-key"
-  
-  # No public IP - database stays private
   associate_public_ip_address = false
 
   user_data = <<-EOF
@@ -218,14 +224,13 @@ resource "aws_lb" "app" {
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
-  subnets            = [aws_subnet.app.id, aws_subnet.public.id]  # Need 2 subnets minimum
+  subnets            = [aws_subnet.app.id, aws_subnet.public.id]
 
   tags = {
     Name = "hospital-alb"
   }
 }
 
-# Security group for ALB
 resource "aws_security_group" "alb" {
   name        = "hospital-alb-sg"
   description = "Allow HTTPS from anywhere"
@@ -257,7 +262,6 @@ resource "aws_security_group" "alb" {
   }
 }
 
-# Target group for app server
 resource "aws_lb_target_group" "app" {
   name     = "hospital-app-tg"
   port     = 8000
@@ -270,14 +274,12 @@ resource "aws_lb_target_group" "app" {
   }
 }
 
-# Attach app server to target group
 resource "aws_lb_target_group_attachment" "app" {
   target_group_arn = aws_lb_target_group.app.arn
   target_id        = aws_instance.app.id
   port             = 80
 }
 
-# ALB listener
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.app.arn
   port              = "80"
@@ -293,11 +295,10 @@ output "alb_dns" {
   value = aws_lb.app.dns_name
 }
 
-# Add public subnet in different AZ for ALB
 resource "aws_subnet" "public" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.0.3.0/24"
-  availability_zone = "us-east-1b"
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = "10.0.3.0/24"
+  availability_zone       = "us-east-1b"
   map_public_ip_on_launch = true
 
   tags = {
@@ -305,13 +306,11 @@ resource "aws_subnet" "public" {
   }
 }
 
-# Associate with route table
 resource "aws_route_table_association" "public" {
   subnet_id      = aws_subnet.public.id
   route_table_id = aws_route_table.app.id
 }
 
-# WAF for geo-restriction
 resource "aws_wafv2_web_acl" "main" {
   name  = "hospital-waf"
   scope = "CLOUDFRONT"
@@ -320,7 +319,6 @@ resource "aws_wafv2_web_acl" "main" {
     block {}
   }
 
-  # Rule 1: Allow only from allowed IPs
   rule {
     name     = "AllowHospitalIPs"
     priority = 1
@@ -349,7 +347,6 @@ resource "aws_wafv2_web_acl" "main" {
   }
 }
 
-# IP set for allowed hospital IPs
 resource "aws_wafv2_ip_set" "hospital_ips" {
   name               = "hospital-allowed-ips"
   scope              = "CLOUDFRONT"
@@ -357,10 +354,9 @@ resource "aws_wafv2_ip_set" "hospital_ips" {
   addresses          = var.allowed_ip_ranges
 }
 
-# CloudFront distribution
 resource "aws_cloudfront_distribution" "main" {
   enabled = true
-  
+
   origin {
     domain_name = aws_lb.app.dns_name
     origin_id   = "hospital-alb"
@@ -387,7 +383,6 @@ resource "aws_cloudfront_distribution" "main" {
     }
   }
 
-  # Geo restriction: US only
   restrictions {
     geo_restriction {
       restriction_type = "whitelist"
@@ -405,3 +400,4 @@ resource "aws_cloudfront_distribution" "main" {
 output "cloudfront_url" {
   value = aws_cloudfront_distribution.main.domain_name
 }
+
