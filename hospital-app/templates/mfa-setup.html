@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MFA Setup - Mount Sinai Hospital</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/login.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card" style="max-width: 600px;">
+            <div class="login-header">
+                <div class="hospital-icon">🔐</div>
+                <h1>MFA Setup</h1>
+                <p>Scan QR Code with Google Authenticator</p>
+            </div>
+            
+            <div class="login-body">
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <h3>Step 1: Choose Your Account</h3>
+                    <select id="user-select" class="form-control" style="font-size: 1.1rem; padding: 1rem;">
+                        <option value="dr.smith">👨‍⚕️ Dr. Sarah Smith (Doctor)</option>
+                        <option value="nurse.johnson">👩‍⚕️ Emily Johnson (Nurse)</option>
+                        <option value="admin">👔 Michael Chen (Admin)</option>
+                        <option value="billing.davis">💰 Jessica Davis (Billing)</option>
+                        <option value="lab.wilson">🔬 Robert Wilson (Lab)</option>
+                        <option value="reception.brown">📋 Lisa Brown (Reception)</option>
+                    </select>
+                </div>
+                
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <h3>Step 2: Scan QR Code</h3>
+                    <div id="qr-container" style="background: white; padding: 2rem; border-radius: 10px; display: inline-block;">
+                        <img id="qr-code" src="" alt="QR Code" style="max-width: 300px; width: 100%;">
+                    </div>
+                </div>
+                
+                <div class="test-credentials">
+                    <h4>📱 Setup Instructions</h4>
+                    <ol style="text-align: left; padding-left: 1.5rem;">
+                        <li>Open <strong>Google Authenticator</strong> app on your phone</li>
+                        <li>Tap <strong>"+"</strong> button</li>
+                        <li>Select <strong>"Scan a QR code"</strong></li>
+                        <li>Point camera at the QR code above</li>
+                        <li>The account will be added automatically</li>
+                    </ol>
+                    
+                    <h4 style="margin-top: 1rem;">⌨️ Manual Entry</h4>
+                    <p><strong>Account:</strong> <code id="account-name">Mount Sinai Hospital</code></p>
+                    <p><strong>Key:</strong> <code>JBSWY3DPEHPK3PXP</code></p>
+                    <p><strong>Type:</strong> Time-based</p>
+                </div>
+                
+                <div style="margin-top: 2rem; text-align: center;">
+                    <a href="/login" class="btn btn-primary" style="padding: 1rem 2rem; font-size: 1.1rem;">
+                        ✅ Done - Go to Login
+                    </a>
+                </div>
+                
+                <div class="back-link">
+                    <a href="/">← Back to Home</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const userSelect = document.getElementById('user-select');
+        const qrCode = document.getElementById('qr-code');
+        const accountName = document.getElementById('account-name');
+        
+        const userNames = {
+            'dr.smith': 'Dr. Sarah Smith',
+            'nurse.johnson': 'Emily Johnson',
+            'admin': 'Michael Chen',
+            'billing.davis': 'Jessica Davis',
+            'lab.wilson': 'Robert Wilson',
+            'reception.brown': 'Lisa Brown'
+        };
+        
+        // Load initial QR code
+        updateQR();
+        
+        userSelect.addEventListener('change', updateQR);
+        
+        function updateQR() {
+            const username = userSelect.value;
+            qrCode.src = `/api/auth/mfa-qr/${username}`;
+            accountName.textContent = `Mount Sinai - ${userNames[username]}`;
+        }
+    </script>
+</body>
+</html>

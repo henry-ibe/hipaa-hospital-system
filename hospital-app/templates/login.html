@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Login - Mount Sinai Hospital</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link rel="stylesheet" href="/static/css/login.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="hospital-icon">🏥</div>
+                <h1>Staff Login</h1>
+                <p>Mount Sinai Hospital Management System</p>
+            </div>
+            
+            <div class="login-body">
+                <div id="alert-container"></div>
+                
+                <!-- Step 1: Username & Password -->
+                <div id="credentials-section">
+                    <form id="login-form">
+                        <div class="form-group">
+                            <label class="form-label">Username</label>
+                            <input type="text" id="username" class="form-control" placeholder="Enter your username" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Password</label>
+                            <input type="password" id="password" class="form-control" placeholder="Enter your password" required>
+                        </div>
+                        
+                        <button type="submit" class="login-btn" id="login-btn">
+                            Continue →
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- Step 2: MFA Code -->
+                <div id="mfa-section" class="mfa-section">
+                    <div style="text-align: center; margin-bottom: 1.5rem;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">🔐</div>
+                        <h3>Two-Factor Authentication</h3>
+                        <p style="color: #6c757d;">Enter the 6-digit code from your authenticator app</p>
+                    </div>
+                    
+                    <form id="mfa-form">
+                        <div class="form-group">
+                            <label class="form-label">MFA Code</label>
+                            <input type="text" id="mfa-code" class="form-control" placeholder="000000" maxlength="6" pattern="[0-9]{6}" required style="text-align: center; font-size: 1.5rem; letter-spacing: 0.5rem;">
+                        </div>
+                        
+                        <button type="submit" class="login-btn" id="mfa-btn">
+                            Verify & Login
+                        </button>
+                        
+                        <button type="button" class="login-btn" id="back-btn" style="background: #6c757d; margin-top: 0.5rem;">
+                            ← Back
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- Test Credentials Info -->
+                <div class="test-credentials">
+                    <h4>🔑 Test Credentials</h4>
+                    <p><strong>Doctor:</strong> <code>dr.smith</code> / <code>doctor123</code></p>
+                    <p><strong>Nurse:</strong> <code>nurse.johnson</code> / <code>nurse123</code></p>
+                    <p><strong>Admin:</strong> <code>admin</code> / <code>admin123</code></p>
+                    <p><strong>Billing:</strong> <code>billing.davis</code> / <code>billing123</code></p>
+                    <p><strong>Lab:</strong> <code>lab.wilson</code> / <code>lab123</code></p>
+                    <p><strong>Reception:</strong> <code>reception.brown</code> / <code>reception123</code></p>
+                    <p style="margin-top: 0.5rem;"><strong>MFA Code:</strong> Use <code>123456</code> for demo</p>
+                </div>
+                
+                <div class="back-link">
+                    <a href="/">← Back to Home</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const credentialsSection = document.getElementById('credentials-section');
+        const mfaSection = document.getElementById('mfa-section');
+        const loginForm = document.getElementById('login-form');
+        const mfaForm = document.getElementById('mfa-form');
+        const alertContainer = document.getElementById('alert-container');
+        
+        let currentUsername = '';
+        let currentRole = '';
+        
+        // Step 1: Login with username/password
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch(`/api/auth/login?username=${username}&password=${password}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentUsername = username;
+                    currentRole = data.role;
+                    
+                    // Show MFA section
+                    credentialsSection.style.display = 'none';
+                    mfaSection.classList.add('active');
+                    
+                    showAlert('Credentials verified! Enter MFA code.', 'success');
+                    document.getElementById('mfa-code').focus();
+                } else {
+                    showAlert(data.message || 'Invalid credentials', 'danger');
+                }
+            } catch (error) {
+                showAlert('Login failed. Please try again.', 'danger');
+            }
+        });
+        
+        // Step 2: Verify MFA
+        mfaForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const mfaCode = document.getElementById('mfa-code').value;
+            
+            try {
+                const response = await fetch(`/api/auth/mfa?username=${currentUsername}&mfa_code=${mfaCode}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Store token
+                    localStorage.setItem('token', data.access_token);
+                    localStorage.setItem('role', data.role);
+                    localStorage.setItem('name', data.name);
+                    localStorage.setItem('department', data.department);
+                    
+                    showAlert('Login successful! Redirecting...', 'success');
+                    
+                    // Redirect to dashboard
+                    setTimeout(() => {
+                        window.location.href = `/dashboard/${data.role}`;
+                    }, 1000);
+                } else {
+                    showAlert('Invalid MFA code', 'danger');
+                }
+            } catch (error) {
+                showAlert('MFA verification failed. Please try again.', 'danger');
+            }
+        });
+        
+        // Back button
+        document.getElementById('back-btn').addEventListener('click', () => {
+            mfaSection.classList.remove('active');
+            credentialsSection.style.display = 'block';
+            document.getElementById('mfa-code').value = '';
+        });
+        
+        // Show alert helper
+        function showAlert(message, type) {
+            alertContainer.innerHTML = `
+                <div class="alert alert-${type}">
+                    ${message}
+                </div>
+            `;
+            
+            setTimeout(() => {
+                alertContainer.innerHTML = '';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reception Dashboard - Mount Sinai Hospital</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-brand">
+            <span>🏥</span>
+            <span>Mount Sinai Hospital</span>
+        </div>
+        <div class="navbar-user">
+            <div class="user-info">
+                <div class="user-name" id="user-name">Loading...</div>
+                <div class="user-role">📋 Reception</div>
+            </div>
+            <button class="btn-logout" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1 style="margin-bottom: 2rem;">📋 Reception Dashboard</h1>
+        
+        <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+            <div class="stat-card" style="background: white; border-radius: 10px; padding: 1.5rem; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 1rem;">
+                <div style="font-size: 3rem; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">📅</div>
+                <div>
+                    <h3 style="font-size: 2rem; margin: 0;" id="total-appointments">0</h3>
+                    <p style="margin: 0; color: #6c757d;">Today's Appointments</p>
+                </div>
+            </div>
+            
+            <div class="stat-card" style="background: white; border-radius: 10px; padding: 1.5rem; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 1rem;">
+                <div style="font-size: 3rem; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: linear-gradient(135deg, #00b09b 0%, #96c93d 100%); color: white;">✅</div>
+                <div>
+                    <h3 style="font-size: 2rem; margin: 0;" id="checked-in">0</h3>
+                    <p style="margin: 0; color: #6c757d;">Checked In</p>
+                </div>
+            </div>
+            
+            <div class="stat-card" style="background: white; border-radius: 10px; padding: 1.5rem; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 1rem;">
+                <div style="font-size: 3rem; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: linear-gradient(135deg, #ffc107 0%, #ff6b6b 100%); color: white;">⏰</div>
+                <div>
+                    <h3 style="font-size: 2rem; margin: 0;" id="waiting">0</h3>
+                    <p style="margin: 0; color: #6c757d;">Waiting</p>
+                </div>
+            </div>
+            
+            <div class="stat-card" style="background: white; border-radius: 10px; padding: 1.5rem; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 1rem;">
+                <div style="font-size: 3rem; width: 70px; height: 70px; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">🆕</div>
+                <div>
+                    <h3 style="font-size: 2rem; margin: 0;">2</h3>
+                    <p style="margin: 0; color: #6c757d;">New Patients</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span>📅 Today's Appointments</span>
+                <button class="btn btn-primary btn-sm" style="padding: 0.5rem 1rem;">+ Schedule New</button>
+            </div>
+            <div class="card-body">
+                <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                    <thead style="background: #2c3e50; color: white;">
+                        <tr>
+                            <th style="padding: 1rem;">Time</th>
+                            <th style="padding: 1rem;">Patient Name</th>
+                            <th style="padding: 1rem;">Doctor</th>
+                            <th style="padding: 1rem;">Type</th>
+                            <th style="padding: 1rem;">Status</th>
+                            <th style="padding: 1rem;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="appointments-tbody">
+                        <tr><td colspan="6" style="text-align: center; padding: 2rem;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) window.location.href = '/login';
+        
+        document.getElementById('user-name').textContent = localStorage.getItem('name') || 'Reception';
+        
+        async function loadAppointments() {
+            try {
+                const response = await fetch('/api/reception/appointments', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+                const appointments = data.appointments;
+                
+                document.getElementById('total-appointments').textContent = appointments.length;
+                document.getElementById('checked-in').textContent = appointments.filter(a => a.status === 'Checked In').length;
+                document.getElementById('waiting').textContent = appointments.filter(a => a.status === 'Scheduled').length;
+                
+                document.getElementById('appointments-tbody').innerHTML = appointments.map(apt => `
+                    <tr style="border-bottom: 1px solid #dee2e6;">
+                        <td style="padding: 1rem;"><strong>${apt.time}</strong></td>
+                        <td style="padding: 1rem;">${apt.patient_name}</td>
+                        <td style="padding: 1rem;">${apt.doctor}</td>
+                        <td style="padding: 1rem;">${apt.type}</td>
+                        <td style="padding: 1rem;">
+                            <span class="badge ${apt.status === 'Checked In' ? 'success' : 'info'}" style="display: inline-block; padding: 0.35rem 0.65rem; font-size: 0.85rem; font-weight: bold; border-radius: 20px;">
+                                ${apt.status}
+                            </span>
+                        </td>
+                        <td style="padding: 1rem;">
+                            ${apt.status === 'Scheduled' ?
+                                `<button class="btn btn-success btn-sm" style="padding: 0.5rem 1rem; font-size: 0.875rem;" onclick="checkin('${apt.id}')">Check In</button>` :
+                                `<button class="btn btn-sm" style="background: #6c757d; color: white; padding: 0.5rem 1rem; font-size: 0.875rem;">Checked In</button>`
+                            }
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        function checkin(appointmentId) {
+            alert(`Checking in patient for appointment ${appointmentId}`);
+        }
+        
+        function logout() {
+            localStorage.clear();
+            window.location.href = '/login';
+        }
+        
+        loadAppointments();
+    </script>
+</body>
+</html>
