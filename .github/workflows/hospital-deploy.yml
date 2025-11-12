@@ -17,6 +17,9 @@ jobs:
   deploy:
     name: Deploy Infrastructure
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     
     steps:
       - name: Checkout
@@ -33,8 +36,10 @@ jobs:
         uses: hashicorp/setup-terraform@v2
         with:
           terraform-version: 1.5.0
+          terraform_wrapper: false
 
       - name: Deploy
+        id: deploy
         run: |
           terraform init
           terraform workspace select ${{ github.event.inputs.region }} || terraform workspace new ${{ github.event.inputs.region }}
@@ -47,3 +52,44 @@ jobs:
           fi
           
           terraform ${{ github.event.inputs.action }} -var-file="${{ github.event.inputs.region }}.tfvars" -auto-approve
+          
+          # Get outputs
+          if [ "${{ github.event.inputs.action }}" = "apply" ]; then
+            SERVER_IP=$(terraform output -raw app_server_ip)
+            echo "server_ip=$SERVER_IP" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update DynamoDB
+        if: github.event.inputs.action == 'apply'
+        run: |
+          # Get region info from tfvars or use defaults
+          REGION="${{ github.event.inputs.region }}"
+          SERVER_IP="${{ steps.deploy.outputs.server_ip }}"
+          
+          # Map region codes to city names and coordinates
+          case "$REGION" in
+            ny) CITY="New York"; HOSPITAL="Mount Sinai Hospital"; LAT="40.7128"; LON="-74.0060"; AWS_REGION="us-east-1";;
+            ca) CITY="Los Angeles"; HOSPITAL="UCLA Medical Center"; LAT="34.0522"; LON="-118.2437"; AWS_REGION="us-west-2";;
+            il) CITY="Chicago"; HOSPITAL="Northwestern Memorial"; LAT="41.8781"; LON="-87.6298"; AWS_REGION="us-east-2";;
+            tx) CITY="Dallas"; HOSPITAL="Baylor Medical Center"; LAT="32.7767"; LON="-96.7970"; AWS_REGION="us-south-1";;
+            fl) CITY="Miami"; HOSPITAL="Jackson Memorial"; LAT="25.7617"; LON="-80.1918"; AWS_REGION="us-east-1";;
+            wa) CITY="Seattle"; HOSPITAL="UW Medical Center"; LAT="47.6062"; LON="-122.3321"; AWS_REGION="us-west-2";;
+            *) CITY="Unknown"; HOSPITAL="Hospital-$REGION"; LAT="39.8283"; LON="-98.5795"; AWS_REGION="us-east-1";;
+          esac
+          
+          # Update DynamoDB
+          aws dynamodb put-item \
+            --table-name hospital-deployments \
+            --item "{
+              \"regionCode\": {\"S\": \"$REGION\"},
+              \"city\": {\"S\": \"$CITY\"},
+              \"state\": {\"S\": \"${REGION^^}\"},
+              \"hospitalName\": {\"S\": \"$HOSPITAL\"},
+              \"awsRegion\": {\"S\": \"$AWS_REGION\"},
+              \"status\": {\"S\": \"active\"},
+              \"ip\": {\"S\": \"$SERVER_IP\"},
+              \"coordinates\": {\"L\": [{\"N\": \"$LAT\"}, {\"N\": \"$LON\"}]},
+              \"deployedAt\": {\"S\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}
+            }"
+          
+          echo "✅ Updated DynamoDB with $REGION deployment"
