@@ -2,8 +2,13 @@
   "name": "hospital-deployment-portal",
   "version": "1.0.0",
   "type": "module",
-  "description": "Self-service hospital deployment platform",
-  "private": true,
+  "homepage": "https://henry-ibe.github.io/hipaa-hospital-system",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "gh-pages -d dist"
+  },
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -11,16 +16,12 @@
     "axios": "^1.6.0",
     "lucide-react": "^0.263.1"
   },
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.0",
     "vite": "^5.0.0",
     "tailwindcss": "^3.3.0",
     "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.32"
+    "postcss": "^8.4.32",
+    "gh-pages": "^6.1.0"
   }
 }

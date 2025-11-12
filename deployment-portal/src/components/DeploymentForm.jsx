@@ -18,12 +18,15 @@ const REGION_MAP = {
   'WA': 'us-west-2'
 }
 
+const API_ENDPOINT = 'https://mz94g5wdhj.execute-api.us-east-1.amazonaws.com/prod/deploy'
+
 export default function DeploymentForm({ onDeploy, onCancel }) {
   const [formData, setFormData] = useState({
     city: '',
     state: '',
     hospitalName: '',
   })
+  const [deploying, setDeploying] = useState(false)
 
   const awsRegion = REGION_MAP[formData.state] || 'us-east-1'
   const cidr = `10.${Math.floor(Math.random() * 200 + 2)}.0.0/16`
@@ -37,16 +40,65 @@ export default function DeploymentForm({ onDeploy, onCancel }) {
     total: 62
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    if (formData.city && formData.state && formData.hospitalName) {
-      onDeploy({
-        ...formData,
-        awsRegion,
-        cidr,
-        regionCode,
-        estimatedCost: estimatedCost.total
+    
+    if (!formData.city || !formData.state || !formData.hospitalName) {
+      alert('Please fill in all fields!')
+      return
+    }
+
+    setDeploying(true)
+
+    try {
+      const response = await fetch(API_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          city: formData.city,
+          state: formData.state,
+          hospitalName: formData.hospitalName,
+          regionCode: regionCode,
+          awsRegion: awsRegion,
+          cidr: cidr
+        })
       })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        alert(`✅ ${data.message}
+
+Deployment started for ${formData.city}, ${formData.state}!
+
+Region Code: ${regionCode}
+AWS Region: ${awsRegion}
+CIDR Block: ${cidr}
+
+Track progress at:
+${data.workflowUrl}
+
+The deployment will take approximately 10 minutes.`)
+        
+        onDeploy({
+          ...formData,
+          awsRegion,
+          cidr,
+          regionCode,
+          estimatedCost: estimatedCost.total
+        })
+      } else {
+        throw new Error(data.message || 'Deployment failed')
+      }
+    } catch (error) {
+      console.error('Deployment error:', error)
+      alert(`❌ Deployment failed: ${error.message}
+
+Please try again or contact support.`)
+    } finally {
+      setDeploying(false)
     }
   }
 
@@ -55,7 +107,6 @@ export default function DeploymentForm({ onDeploy, onCancel }) {
       <h3 className="text-xl font-bold text-white mb-6">🚀 Deploy New Hospital Region</h3>
       
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* City Input */}
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-2">
             <MapPin className="w-4 h-4 inline mr-1" />
@@ -68,10 +119,10 @@ export default function DeploymentForm({ onDeploy, onCancel }) {
             placeholder="e.g., Dallas, Chicago"
             className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
+            disabled={deploying}
           />
         </div>
 
-        {/* State Select */}
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-2">
             📍 State *
@@ -81,6 +132,7 @@ export default function DeploymentForm({ onDeploy, onCancel }) {
             onChange={(e) => setFormData({...formData, state: e.target.value})}
             className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
+            disabled={deploying}
           >
             <option value="">Select State</option>
             {US_STATES.map(state => (
@@ -89,7 +141,6 @@ export default function DeploymentForm({ onDeploy, onCancel }) {
           </select>
         </div>
 
-        {/* Hospital Name */}
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-2">
             <Building2 className="w-4 h-4 inline mr-1" />
@@ -102,10 +153,10 @@ export default function DeploymentForm({ onDeploy, onCancel }) {
             placeholder="e.g., Baylor Medical Center"
             className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
+            disabled={deploying}
           />
         </div>
 
-        {/* Auto-detected Info */}
         {formData.state && (
           <div className="bg-slate-700 rounded-lg p-4 space-y-2">
             <p className="text-sm font-medium text-green-400">✅ Auto-detected:</p>
@@ -117,7 +168,6 @@ export default function DeploymentForm({ onDeploy, onCancel }) {
           </div>
         )}
 
-        {/* Cost Estimate */}
         {formData.state && (
           <div className="bg-slate-700 rounded-lg p-4">
             <p className="text-sm font-medium text-slate-300 mb-3">
@@ -149,18 +199,23 @@ export default function DeploymentForm({ onDeploy, onCancel }) {
           </div>
         )}
 
-        {/* Buttons */}
         <div className="flex space-x-3 pt-4">
           <button
             type="submit"
-            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+            disabled={deploying}
+            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center"
           >
-            🚀 Deploy Region
+            {deploying ? (
+              <>⏳ Deploying...</>
+            ) : (
+              <>🚀 Deploy Region</>
+            )}
           </button>
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+            disabled={deploying}
+            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:bg-gray-700 text-white rounded-lg font-medium transition-colors"
           >
             Cancel
           </button>
