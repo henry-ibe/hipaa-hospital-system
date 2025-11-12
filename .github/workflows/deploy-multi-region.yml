@@ -4,32 +4,22 @@ on:
   workflow_dispatch:
     inputs:
       region:
-        description: 'Target Region'
+        description: 'Target Region Code (e.g., ny, ca, tx, fl)'
         required: true
-        type: choice
-        options:
-          - ny-hospital
-          - ca-hospital
-          - both
+        type: string
       action:
-        description: 'Action'
+        description: 'Terraform Action'
         required: true
         type: choice
+        default: 'apply'
         options:
+          - plan
           - apply
           - destroy
-          - plan
-
-  push:
-    branches:
-      - main
-    paths:
-      - 'main.tf'
-      - '**.tfvars'
 
 jobs:
   deploy:
-    name: Deploy to AWS
+    name: Deploy Infrastructure
     runs-on: ubuntu-latest
     
     steps:
@@ -46,52 +36,46 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 1.5.0
+          terraform-version: 1.5.0
 
       - name: Terraform Init
         run: terraform init
 
-      - name: Deploy to NY Region
-        if: ${{ github.event.inputs.region == 'ny-hospital' || github.event.inputs.region == 'both' || github.ref == 'refs/heads/main' }}
+      - name: Deploy Region
         run: |
-          terraform workspace select ny-hospital || terraform workspace new ny-hospital
-          terraform ${{ github.event.inputs.action || 'plan' }} -var-file="ny-hospital.tfvars" -auto-approve
+          REGION="${{ github.event.inputs.region }}"
+          ACTION="${{ github.event.inputs.action }}"
+          
+          echo "Deploying to region: $REGION"
+          echo "Action: $ACTION"
+          
+          # Create workspace if it doesn't exist
+          terraform workspace select $REGION || terraform workspace new $REGION
+          
+          # Check if tfvars file exists, if not create a basic one
+          if [ ! -f "${REGION}.tfvars" ]; then
+            echo "Creating ${REGION}.tfvars..."
+            cat > ${REGION}.tfvars << TFVARS
+hospital_name = "Hospital-${REGION}"
+location = "Region ${REGION}"
+allowed_ip_ranges = ["3.80.190.60/32"]
+allowed_states = ["${REGION^^}"]
+TFVARS
+          fi
+          
+          # Run terraform
+          if [ "$ACTION" = "apply" ]; then
+            terraform apply -var-file="${REGION}.tfvars" -auto-approve
+          elif [ "$ACTION" = "destroy" ]; then
+            terraform destroy -var-file="${REGION}.tfvars" -auto-approve
+          else
+            terraform plan -var-file="${REGION}.tfvars"
+          fi
 
-      - name: Deploy to CA Region
-        if: ${{ github.event.inputs.region == 'ca-hospital' || github.event.inputs.region == 'both' }}
+      - name: Output Results
+        if: always()
         run: |
-          terraform workspace select ca-hospital || terraform workspace new ca-hospital
-          terraform ${{ github.event.inputs.action || 'apply' }} -var-file="ca-hospital.tfvars" -auto-approve
-
-      - name: Output Infrastructure Details
-        run: |
-          echo "### Deployment Complete! 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "### 🎉 Deployment Complete!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Region:** ${{ github.event.inputs.region || 'ny-hospital (auto)' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Action:** ${{ github.event.inputs.action || 'apply' }}" >> $GITHUB_STEP_SUMMARY
-          terraform output -json >> deployment-outputs.json
-
-      - name: Upload Outputs
-        uses: actions/upload-artifact@v3
-        with:
-          name: terraform-outputs
-          path: deployment-outputs.json
-
-  notify:
-    name: Notify Deployment Status
-    runs-on: ubuntu-latest
-    needs: deploy
-    if: always()
-    steps:
-      - name: Deployment Success
-        if: ${{ needs.deploy.result == 'success' }}
-        run: |
-          echo "✅ Multi-region deployment successful!"
-          echo "NY Hospital: http://$(terraform output -raw app_server_ip):5000"
-          echo "Grafana: http://$(terraform output -raw app_server_ip):3000"
-
-      - name: Deployment Failed
-        if: ${{ needs.deploy.result == 'failure' }}
-        run: |
-          echo "❌ Deployment failed. Check logs above."
-          exit 1
+          echo "**Region:** ${{ github.event.inputs.region }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Action:** ${{ github.event.inputs.action }}" >> $GITHUB_STEP_SUMMARY
