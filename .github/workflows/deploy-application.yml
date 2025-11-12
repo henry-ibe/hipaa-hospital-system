@@ -1,0 +1,67 @@
+name: Deploy Hospital Application
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_region:
+        description: 'Deploy application to region'
+        required: true
+        type: choice
+        options:
+          - ny
+          - ca
+          - both
+
+  workflow_run:
+    workflows: ["Deploy Hospital System to AWS Regions"]
+    types:
+      - completed
+
+jobs:
+  deploy-app:
+    name: Deploy Application Code
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/hospital-key.pem
+          chmod 600 ~/.ssh/hospital-key.pem
+
+      - name: Deploy to NY
+        if: ${{ github.event.inputs.target_region == 'ny' || github.event.inputs.target_region == 'both' }}
+        run: |
+          # Copy application files
+          scp -i ~/.ssh/hospital-key.pem -r hospital-app/* ec2-user@${{ secrets.NY_SERVER_IP }}:~/hospital-app/
+          
+          # Restart services
+          ssh -i ~/.ssh/hospital-key.pem ec2-user@${{ secrets.NY_SERVER_IP }} << 'ENDSSH'
+            cd ~/hospital-app
+            pkill -f "uvicorn main:app" || true
+            nohup python3 -m uvicorn main:app --host 0.0.0.0 --port 5000 > app.log 2>&1 &
+            sleep 5
+            curl localhost:5000/health
+          ENDSSH
+
+      - name: Deploy to CA
+        if: ${{ github.event.inputs.target_region == 'ca' || github.event.inputs.target_region == 'both' }}
+        run: |
+          scp -i ~/.ssh/hospital-key.pem -r hospital-app/* ec2-user@${{ secrets.CA_SERVER_IP }}:~/hospital-app/
+          
+          ssh -i ~/.ssh/hospital-key.pem ec2-user@${{ secrets.CA_SERVER_IP }} << 'ENDSSH'
+            cd ~/hospital-app
+            pkill -f "uvicorn main:app" || true
+            nohup python3 -m uvicorn main:app --host 0.0.0.0 --port 5000 > app.log 2>&1 &
+            sleep 5
+            curl localhost:5000/health
+          ENDSSH
+
+      - name: Health Check
+        run: |
+          echo "### Application Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "Testing endpoints..." >> $GITHUB_STEP_SUMMARY

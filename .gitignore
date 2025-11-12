@@ -1,0 +1,31 @@
+# Logs
+*.log
+nohup.out
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+terraform.tfvars.backup
+
+# Keys
+*.pem
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Application specific
+hospital-app/*.png
+hospital-app/grafana*/
+hospital-app/prometheus*/
+hospital-app/node_exporter*/
