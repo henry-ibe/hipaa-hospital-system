@@ -38,8 +38,8 @@ jobs:
           terraform-version: 1.5.0
           terraform_wrapper: false
 
-      - name: Deploy
-        id: deploy
+      - name: Deploy or Destroy
+        id: terraform
         run: |
           terraform init
           terraform workspace select ${{ github.event.inputs.region }} || terraform workspace new ${{ github.event.inputs.region }}
@@ -53,20 +53,17 @@ jobs:
           
           terraform ${{ github.event.inputs.action }} -var-file="${{ github.event.inputs.region }}.tfvars" -auto-approve
           
-          # Get outputs
           if [ "${{ github.event.inputs.action }}" = "apply" ]; then
             SERVER_IP=$(terraform output -raw app_server_ip)
             echo "server_ip=$SERVER_IP" >> $GITHUB_OUTPUT
           fi
 
-      - name: Update DynamoDB
+      - name: Update DynamoDB (Apply)
         if: github.event.inputs.action == 'apply'
         run: |
-          # Get region info from tfvars or use defaults
           REGION="${{ github.event.inputs.region }}"
-          SERVER_IP="${{ steps.deploy.outputs.server_ip }}"
+          SERVER_IP="${{ steps.terraform.outputs.server_ip }}"
           
-          # Map region codes to city names and coordinates
           case "$REGION" in
             ny) CITY="New York"; HOSPITAL="Mount Sinai Hospital"; LAT="40.7128"; LON="-74.0060"; AWS_REGION="us-east-1";;
             ca) CITY="Los Angeles"; HOSPITAL="UCLA Medical Center"; LAT="34.0522"; LON="-118.2437"; AWS_REGION="us-west-2";;
@@ -77,7 +74,6 @@ jobs:
             *) CITY="Unknown"; HOSPITAL="Hospital-$REGION"; LAT="39.8283"; LON="-98.5795"; AWS_REGION="us-east-1";;
           esac
           
-          # Update DynamoDB
           aws dynamodb put-item \
             --table-name hospital-deployments \
             --item "{
@@ -93,3 +89,19 @@ jobs:
             }"
           
           echo "✅ Updated DynamoDB with $REGION deployment"
+
+      - name: Remove from DynamoDB (Destroy)
+        if: github.event.inputs.action == 'destroy'
+        run: |
+          REGION="${{ github.event.inputs.region }}"
+          
+          # Delete the DynamoDB record
+          aws dynamodb delete-item \
+            --table-name hospital-deployments \
+            --key "{\"regionCode\": {\"S\": \"$REGION\"}}"
+          
+          echo "✅ Removed $REGION from DynamoDB"
+          
+          # Delete the workspace
+          terraform workspace select default
+          terraform workspace delete $REGION || echo "Workspace already deleted"
