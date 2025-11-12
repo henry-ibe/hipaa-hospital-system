@@ -1,0 +1,97 @@
+name: Deploy Hospital System to AWS Regions
+
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: 'Target Region'
+        required: true
+        type: choice
+        options:
+          - ny-hospital
+          - ca-hospital
+          - both
+      action:
+        description: 'Action'
+        required: true
+        type: choice
+        options:
+          - apply
+          - destroy
+          - plan
+
+  push:
+    branches:
+      - main
+    paths:
+      - 'main.tf'
+      - '**.tfvars'
+
+jobs:
+  deploy:
+    name: Deploy to AWS
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Deploy to NY Region
+        if: ${{ github.event.inputs.region == 'ny-hospital' || github.event.inputs.region == 'both' || github.ref == 'refs/heads/main' }}
+        run: |
+          terraform workspace select ny-hospital || terraform workspace new ny-hospital
+          terraform ${{ github.event.inputs.action || 'plan' }} -var-file="ny-hospital.tfvars" -auto-approve
+
+      - name: Deploy to CA Region
+        if: ${{ github.event.inputs.region == 'ca-hospital' || github.event.inputs.region == 'both' }}
+        run: |
+          terraform workspace select ca-hospital || terraform workspace new ca-hospital
+          terraform ${{ github.event.inputs.action || 'apply' }} -var-file="ca-hospital.tfvars" -auto-approve
+
+      - name: Output Infrastructure Details
+        run: |
+          echo "### Deployment Complete! 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Region:** ${{ github.event.inputs.region || 'ny-hospital (auto)' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Action:** ${{ github.event.inputs.action || 'apply' }}" >> $GITHUB_STEP_SUMMARY
+          terraform output -json >> deployment-outputs.json
+
+      - name: Upload Outputs
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-outputs
+          path: deployment-outputs.json
+
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+    steps:
+      - name: Deployment Success
+        if: ${{ needs.deploy.result == 'success' }}
+        run: |
+          echo "✅ Multi-region deployment successful!"
+          echo "NY Hospital: http://$(terraform output -raw app_server_ip):5000"
+          echo "Grafana: http://$(terraform output -raw app_server_ip):3000"
+
+      - name: Deployment Failed
+        if: ${{ needs.deploy.result == 'failure' }}
+        run: |
+          echo "❌ Deployment failed. Check logs above."
+          exit 1
