@@ -1,0 +1,49 @@
+name: Hospital Region Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: 'Region Code (ny, ca, tx, fl, etc)'
+        required: true
+        type: string
+      action:
+        description: 'Action'
+        required: true
+        type: string
+        default: 'apply'
+
+jobs:
+  deploy:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform-version: 1.5.0
+
+      - name: Deploy
+        run: |
+          terraform init
+          terraform workspace select ${{ github.event.inputs.region }} || terraform workspace new ${{ github.event.inputs.region }}
+          
+          if [ ! -f "${{ github.event.inputs.region }}.tfvars" ]; then
+            echo 'hospital_name = "Hospital-${{ github.event.inputs.region }}"' > ${{ github.event.inputs.region }}.tfvars
+            echo 'location = "${{ github.event.inputs.region }}"' >> ${{ github.event.inputs.region }}.tfvars
+            echo 'allowed_ip_ranges = ["3.80.190.60/32"]' >> ${{ github.event.inputs.region }}.tfvars
+            echo 'allowed_states = ["${{ github.event.inputs.region }}"]' >> ${{ github.event.inputs.region }}.tfvars
+          fi
+          
+          terraform ${{ github.event.inputs.action }} -var-file="${{ github.event.inputs.region }}.tfvars" -auto-approve
