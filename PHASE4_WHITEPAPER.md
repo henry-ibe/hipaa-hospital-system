@@ -1698,3 +1698,75 @@ All metrics flowing to Prometheus and ready for visualization in Grafana:
 **Status:** Metrics collection complete ✅ | Dashboard creation: Next phase
 
 ---
+
+---
+
+## Phase 4f: Dynamic Region-Specific Metrics Implementation
+
+### Overview
+Implemented realistic, region-specific business metrics that generate data based on hospital type and location characteristics.
+
+### Region Profiles Created
+
+**New York - Mount Sinai Hospital (Urban High-Volume):**
+- Patient multiplier: 1.5x (50% more patients)
+- Wait time base: 30 minutes
+- Bed occupancy: 85% baseline
+- Emergency focus: 1.8x multiplier
+- Cost: $0.065 per transaction (NYC pricing)
+- Satisfaction: 4.2-4.6/5
+
+**California - UCLA Medical Center (Research Hospital):**
+- Patient multiplier: 1.2x
+- Wait time base: 20 minutes
+- Bed occupancy: 75% baseline
+- Surgery focus: 1.6x multiplier
+- Radiology focus: 1.4x multiplier
+- Cost: $0.060 per transaction
+- Satisfaction: 4.5-4.8/5 (research quality)
+
+**Illinois - Northwestern Memorial (Teaching Hospital):**
+- Patient multiplier: 1.0x (baseline)
+- Wait time base: 15 minutes
+- Bed occupancy: 70% baseline
+- Cardiology focus: 1.5x multiplier
+- Cost: $0.045 per transaction (Midwest pricing)
+- Satisfaction: 4.3-4.7/5
+
+### Technical Implementation
+
+**Automatic Region Detection:**
+```python
+def get_region_from_ip():
+    hostname = socket.gethostname()
+    ip = socket.gethostbyname(hostname)
+    
+    if ip.startswith('10.0.1.'):
+        return 'ny', 'Mount Sinai Hospital'
+    elif ip.startswith('10.0.2.'):
+        return 'ca', 'UCLA Medical Center'
+    elif ip.startswith('10.0.3.'):
+        return 'il', 'Northwestern Memorial'
+```
+
+### Monitoring Architecture Fix
+
+**Problem:** Label conflicts causing duplicate metrics in Grafana
+**Solution:** 
+- Removed redundant region labels from Prometheus scrape config
+- Application exports region directly in metrics
+- Federation uses `honor_labels: true`
+- Result: Clean single metric series per region
+
+### Business Value
+
+Executives can now:
+- Compare performance across hospital types
+- Understand cost implications by location
+- Make data-driven expansion decisions
+- See realistic operational patterns
+
+**Status:** Complete ✅
+**Completion Date:** November 13, 2025
+
+---
