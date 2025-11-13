@@ -29,3 +29,7 @@ hospital-app/*.png
 hospital-app/grafana*/
 hospital-app/prometheus*/
 hospital-app/node_exporter*/
+
+# Secrets and credentials
+lambda-deployment-api/add_secrets.py
+*_secrets.py
