@@ -33,3 +33,5 @@ hospital-app/node_exporter*/
 # Secrets and credentials
 lambda-deployment-api/add_secrets.py
 *_secrets.py
+node_modules/
+lambda-deployment-api/node_modules/
