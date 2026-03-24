@@ -172,7 +172,7 @@ hipaa-hospital-system/
 ├── ca-hospital.tfvars       # California region variables
 ├── tx-hospital.tfvars       # Texas region variables
 ├── grafana-hospital-dashboard.json   # Grafana dashboard config
-└── PHASE4_WHITEPAPER.md     # Architecture deep-dive document
+└── WHITEPAPER.md     # Architecture deep-dive document
 ```
 
 ---
@@ -195,7 +195,7 @@ This project was built to showcase real DevOps and cloud engineering skills:
 
 ## 📄 Architecture Whitepaper
 
-For a deep-dive into the design decisions, infrastructure patterns, and HIPAA considerations, see [`PHASE4_WHITEPAPER.md`](./PHASE4_WHITEPAPER.md).
+For a deep-dive into the design decisions, infrastructure patterns, and HIPAA considerations, see [`WHITEPAPER.md`](./WHITEPAPER.md).
 
 ---
 
