@@ -1,12 +1,12 @@
-# Phase 4: Self-Service Deployment Platform - Implementation White Paper
+WHITEPAPER.md
 
-## Executive Summary
+HIPAA-Compliant Multi-Region Hospital Management System — Technical Whitepaper
 
-Phase 4 transforms the multi-region hospital management system into a fully automated, self-service infrastructure deployment platform. This phase implements a production-grade solution where authorized users can deploy new hospital regions through a web interface, with complete automation from form submission to live infrastructure.
+This document is a technical deep-dive into the architecture, design decisions, and implementation details of this project. It covers infrastructure provisioning, backend API design, self-service platform development, observability, and production hardening. It is intended to demonstrate real-world engineering thinking, cloud architecture skills, and production-grade systems design.
 
-**Key Achievement:** Built an enterprise-grade platform that provisions complete hospital infrastructure (VPC, EC2, ALB, CloudFront, Security Groups, Application) in any AWS region via a single button click.
-
----
+Author: Henry Ibe — Systems & Cloud Infrastructure Engineer
+Project: Multi-Region Hospital Management System
+Last Updated: November 2025
 
 ## Architecture Overview
 ```
@@ -445,7 +445,7 @@ aws apigatewayv2 create-api \
 aws apigatewayv2 create-integration \
   --api-id $API_ID \
   --integration-type AWS_PROXY \
-  --integration-uri arn:aws:lambda:us-east-1:782781395980:function:hospital-deployment-api \
+  --integration-uri arn:aws:lambda:us-east-1:YOUR_ACCOUNT_ID:function:hospital-deployment-api \
   --payload-format-version 2.0
 
 # Create routes
@@ -973,7 +973,7 @@ aws cloudwatch put-metric-alarm \
   --evaluation-periods 1 \
   --threshold 5 \
   --comparison-operator GreaterThanThreshold \
-  --alarm-actions arn:aws:sns:us-east-1:782781395980:admin-alerts
+  --alarm-actions arn:aws:sns:us-east-1:YOUR_ACCOUNT_ID:admin-alerts
 ```
 
 #### Application Logs
