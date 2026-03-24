@@ -1,12 +1,36 @@
-WHITEPAPER.md
+# HIPAA-Compliant Multi-Region Hospital Management System — Technical Whitepaper
 
-HIPAA-Compliant Multi-Region Hospital Management System — Technical Whitepaper
+> This document is a technical deep-dive into the architecture, design decisions, and implementation details of this project. It covers infrastructure provisioning, backend API design, self-service platform development, observability, and production hardening. It is intended to demonstrate real-world engineering thinking, cloud architecture skills, and production-grade systems design.
 
-This document is a technical deep-dive into the architecture, design decisions, and implementation details of this project. It covers infrastructure provisioning, backend API design, self-service platform development, observability, and production hardening. It is intended to demonstrate real-world engineering thinking, cloud architecture skills, and production-grade systems design.
+**Author:** Henry Ibe — Systems & Cloud Infrastructure Engineer  
+**Project:** Multi-Region Hospital Management System  
+**Last Updated:** November 2025  
+[![GitHub](https://img.shields.io/badge/GitHub-henry--ibe-181717?logo=github)](https://github.com/henry-ibe)
 
-Author: Henry Ibe — Systems & Cloud Infrastructure Engineer
-Project: Multi-Region Hospital Management System
-Last Updated: November 2025
+---
+
+## Table of Contents
+
+- [Executive Summary](#executive-summary)
+- [Architecture Overview](#architecture-overview)
+- [Phase 4a: React Frontend](#phase-4a-frontend---react-dashboard)
+- [Phase 4b: Lambda Backend & DynamoDB](#phase-4b-backend---aws-lambda--dynamodb)
+- [Phase 4c: End-to-End Integration](#phase-4c-integration---end-to-end-workflow)
+- [Phase 4d: Production Hardening](#phase-4d-post-integration-enhancements--production-hardening)
+- [Phase 4e: Monitoring & Observability](#phase-4e-elite-monitoring--observability)
+- [Phase 4f: Dynamic Region Metrics](#phase-4f-dynamic-region-specific-metrics-implementation)
+
+---
+
+# Phase 4: Self-Service Deployment Platform — Implementation
+
+## Executive Summary
+
+Phase 4 transforms the multi-region hospital management system into a fully automated, self-service infrastructure deployment platform. This phase implements a production-grade solution where authorized users can deploy new hospital regions through a web interface, with complete automation from form submission to live infrastructure.
+
+**Key Achievement:** Built an enterprise-grade platform that provisions complete hospital infrastructure (VPC, EC2, ALB, CloudFront, Security Groups, Application) in any AWS region via a single button click.
+
+---
 
 ## Architecture Overview
 ```
