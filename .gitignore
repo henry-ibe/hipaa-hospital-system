@@ -35,3 +35,4 @@ lambda-deployment-api/add_secrets.py
 *_secrets.py
 node_modules/
 lambda-deployment-api/node_modules/
+*.tfstate*
