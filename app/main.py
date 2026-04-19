@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import pyotp
@@ -43,8 +44,10 @@ def root():
 @app.post("/login")
 def login(username: str, password: str):
     user = USERS.get(username)
+    AUTH_ATTEMPTS.labels(status="success", region=REGION, hospital=HOSPITAL).inc()
     if user and user["password"] == password:
         return {"status": "mfa_required", "username": username}
+    AUTH_ATTEMPTS.labels(status="failed", region=REGION, hospital=HOSPITAL).inc()
     raise HTTPException(401, "Invalid credentials")
 
 @app.post("/mfa/verify")
@@ -167,6 +170,7 @@ def write_prescription(
         "date": "2025-11-08"
     }
     prescriptions_db.append(prescription)
+    PRESCRIPTIONS_WRITTEN.labels(medication_type=medication, region=REGION, hospital=HOSPITAL).inc()
     log_access(token_data["username"], token_data["role"], "/prescriptions POST", patient_name)
     return {"status": "prescribed", "prescription": prescription}
 
@@ -196,6 +200,8 @@ def create_invoice(
         "status": "pending"
     }
     billing_db.append(invoice)
+    BILLING_TRANSACTIONS.labels(status="success", region=REGION, hospital=HOSPITAL).inc()
+    BILLING_AMOUNT.labels(region=REGION, hospital=HOSPITAL).inc(amount)
     log_access(token_data["username"], token_data["role"], "/billing POST", patient_name)
     return {"status": "invoice_created", "invoice": invoice}
 
@@ -206,3 +212,178 @@ def view_invoices(token_data: dict = Depends(verify_token)):
         raise HTTPException(403, "Requires admin role")
     log_access(token_data["username"], token_data["role"], "/billing GET", None)
     return {"invoices": billing_db}
+
+# ── Observability endpoints ──────────────────────────────────────────
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from fastapi.responses import Response
+import time
+
+REQUEST_COUNT = Counter(
+    'hospital_requests_total',
+    'Total requests',
+    ['method', 'endpoint', 'status', 'region', 'hospital']
+)
+
+REQUEST_LATENCY = Histogram(
+    'hospital_request_duration_seconds',
+    'Request latency',
+    ['endpoint', 'region', 'hospital']
+)
+
+BED_OCCUPANCY = Gauge(
+    'hospital_bed_occupancy_ratio',
+    'Bed occupancy by department',
+    ['department', 'region', 'hospital']
+)
+
+REGION = os.getenv("HOSPITAL_REGION", "unknown")
+HOSPITAL = os.getenv("HOSPITAL_NAME", "unknown")
+
+# Seed some bed occupancy metrics
+BED_OCCUPANCY.labels(department="emergency", region=REGION, hospital=HOSPITAL).set(0.87)
+BED_OCCUPANCY.labels(department="icu", region=REGION, hospital=HOSPITAL).set(0.92)
+BED_OCCUPANCY.labels(department="general", region=REGION, hospital=HOSPITAL).set(0.65)
+
+@app.get("/health")
+def health():
+    return {"status": "healthy", "region": REGION, "hospital": HOSPITAL}
+
+@app.get("/metrics")
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+# ── Extended Business Metrics ────────────────────────────────────────
+
+# Patient metrics
+PATIENT_ADMISSIONS = Counter(
+    'hospital_patient_admissions_total',
+    'Total patient admissions',
+    ['department', 'region', 'hospital']
+)
+
+PATIENT_WAIT_TIME = Histogram(
+    'hospital_patient_wait_seconds',
+    'Patient wait time in seconds',
+    ['department', 'region', 'hospital'],
+    buckets=[300, 600, 900, 1800, 3600, 7200]
+)
+
+PATIENTS_ACTIVE = Gauge(
+    'hospital_patients_active',
+    'Currently active patients',
+    ['department', 'region', 'hospital']
+)
+
+# API performance
+API_REQUEST_COUNT = Counter(
+    'hospital_api_requests_total',
+    'Total API requests',
+    ['method', 'endpoint', 'status_code', 'region', 'hospital']
+)
+
+API_LATENCY = Histogram(
+    'hospital_api_duration_seconds',
+    'API request duration',
+    ['endpoint', 'region', 'hospital'],
+    buckets=[0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0]
+)
+
+# Appointment metrics
+APPOINTMENTS_BOOKED = Counter(
+    'hospital_appointments_booked_total',
+    'Total appointments booked',
+    ['department', 'region', 'hospital']
+)
+
+APPOINTMENTS_CANCELLED = Counter(
+    'hospital_appointments_cancelled_total',
+    'Total appointments cancelled',
+    ['department', 'region', 'hospital']
+)
+
+# Billing metrics
+BILLING_TRANSACTIONS = Counter(
+    'hospital_billing_transactions_total',
+    'Total billing transactions',
+    ['status', 'region', 'hospital']
+)
+
+BILLING_AMOUNT = Counter(
+    'hospital_billing_amount_dollars_total',
+    'Total billing amount in dollars',
+    ['region', 'hospital']
+)
+
+# Prescription metrics
+PRESCRIPTIONS_WRITTEN = Counter(
+    'hospital_prescriptions_written_total',
+    'Total prescriptions written',
+    ['medication_type', 'region', 'hospital']
+)
+
+# Auth metrics
+AUTH_ATTEMPTS = Counter(
+    'hospital_auth_attempts_total',
+    'Total authentication attempts',
+    ['status', 'region', 'hospital']
+)
+
+MFA_FAILURES = Counter(
+    'hospital_mfa_failures_total',
+    'Total MFA verification failures',
+    ['region', 'hospital']
+)
+
+# Database metrics
+DB_QUERY_LATENCY = Histogram(
+    'hospital_db_query_seconds',
+    'Database query duration',
+    ['query_type', 'region', 'hospital'],
+    buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0]
+)
+
+DB_CONNECTION_POOL = Gauge(
+    'hospital_db_connection_pool_usage',
+    'DB connection pool usage ratio',
+    ['region', 'hospital']
+)
+
+# Seed realistic initial values
+import random
+
+# Active patients per department
+PATIENTS_ACTIVE.labels(department="emergency", region=REGION, hospital=HOSPITAL).set(random.randint(18, 35))
+PATIENTS_ACTIVE.labels(department="icu", region=REGION, hospital=HOSPITAL).set(random.randint(8, 15))
+PATIENTS_ACTIVE.labels(department="general", region=REGION, hospital=HOSPITAL).set(random.randint(45, 80))
+PATIENTS_ACTIVE.labels(department="surgery", region=REGION, hospital=HOSPITAL).set(random.randint(5, 12))
+
+# DB connection pool
+DB_CONNECTION_POOL.labels(region=REGION, hospital=HOSPITAL).set(round(random.uniform(0.3, 0.7), 2))
+
+# Middleware to track every API request automatically
+from fastapi import Request
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class MetricsMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start = time.time()
+        response = await call_next(request)
+        duration = time.time() - start
+
+        API_REQUEST_COUNT.labels(
+            method=request.method,
+            endpoint=request.url.path,
+            status_code=response.status_code,
+            region=REGION,
+            hospital=HOSPITAL
+        ).inc()
+
+        API_LATENCY.labels(
+            endpoint=request.url.path,
+            region=REGION,
+            hospital=HOSPITAL
+        ).observe(duration)
+
+        return response
+
+app.add_middleware(MetricsMiddleware)

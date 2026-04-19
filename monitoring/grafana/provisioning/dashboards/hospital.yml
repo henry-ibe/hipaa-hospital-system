@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Hospital Dashboards
+    folder: Hospital SRO
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

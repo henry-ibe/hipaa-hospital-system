@@ -1,0 +1,131 @@
+{
+  "title": "Hospital SRO — Live Operations",
+  "uid": "hospital-sro",
+  "timezone": "browser",
+  "refresh": "15s",
+  "templating": {
+    "list": [
+      {
+        "name": "region",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(up, region)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "label": "Region"
+      },
+      {
+        "name": "hospital",
+        "type": "query",
+        "datasource": "Prometheus",
+        "query": "label_values(up{region=~\"$region\"}, hospital)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "label": "Hospital"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "title": "App Health",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "targets": [{"expr": "up{job=\"hospital-app\", region=~\"$region\"}", "legendFormat": "{{region}}"}],
+      "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]}}
+    },
+    {
+      "title": "Active Patients",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "targets": [{"expr": "sum by (region) (hospital_patients_active{region=~\"$region\"})", "legendFormat": "{{region}}"}],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 80}, {"color": "red", "value": 120}]}}}
+    },
+    {
+      "title": "DB Connection Pool Usage",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "targets": [{"expr": "hospital_db_connection_pool_usage{region=~\"$region\"} * 100", "legendFormat": "{{region}}"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "thresholds": {"steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 70}, {"color": "red", "value": 90}]}}}
+    },
+    {
+      "title": "API Request Rate",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
+      "targets": [{"expr": "sum by (region) (rate(hospital_api_requests_total{region=~\"$region\"}[5m])) * 60", "legendFormat": "{{region}}"}],
+      "fieldConfig": {"defaults": {"unit": "reqpm"}}
+    },
+    {
+      "title": "API Error Rate %",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+      "targets": [{"expr": "sum(rate(hospital_api_requests_total{status_code=~\"5..\", region=~\"$region\"}[5m])) / sum(rate(hospital_api_requests_total{region=~\"$region\"}[5m])) * 100", "legendFormat": "error rate"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "thresholds": {"steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 1}, {"color": "red", "value": 5}]}}}
+    },
+    {
+      "title": "Auth Failures",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 20, "y": 0},
+      "targets": [{"expr": "sum(increase(hospital_auth_attempts_total{status=\"failed\", region=~\"$region\"}[1h]))", "legendFormat": "last 1h"}],
+      "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 10}, {"color": "red", "value": 50}]}}}
+    },
+    {
+      "title": "Active Patients by Department",
+      "type": "bargauge",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "targets": [{"expr": "hospital_patients_active{region=~\"$region\"}", "legendFormat": "{{department}} — {{region}}"}],
+      "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 20}, {"color": "red", "value": 40}]}}}
+    },
+    {
+      "title": "Bed Occupancy by Department",
+      "type": "bargauge",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "targets": [{"expr": "hospital_bed_occupancy_ratio{region=~\"$region\"} * 100", "legendFormat": "{{department}} — {{region}}"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "thresholds": {"steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 80}, {"color": "red", "value": 95}]}}}
+    },
+    {
+      "title": "API P99 Latency by Endpoint",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "targets": [{"expr": "histogram_quantile(0.99, sum by (endpoint, le) (rate(hospital_api_duration_seconds_bucket{region=~\"$region\"}[5m])))", "legendFormat": "{{endpoint}}"}],
+      "fieldConfig": {"defaults": {"unit": "s", "thresholds": {"steps": [{"color": "green", "value": 0}, {"color": "yellow", "value": 1}, {"color": "red", "value": 2}]}}}
+    },
+    {
+      "title": "CPU Usage % by Region",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "targets": [{"expr": "100 - (avg by (region, hospital) (rate(node_cpu_seconds_total{mode=\"idle\", region=~\"$region\"}[5m])) * 100)", "legendFormat": "{{region}} — {{hospital}}"}],
+      "fieldConfig": {"defaults": {"unit": "percent"}}
+    },
+    {
+      "title": "Memory Usage % by Region",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+      "targets": [{"expr": "(1 - (node_memory_MemAvailable_bytes{region=~\"$region\"} / node_memory_MemTotal_bytes{region=~\"$region\"})) * 100", "legendFormat": "{{region}} — {{hospital}}"}],
+      "fieldConfig": {"defaults": {"unit": "percent"}}
+    },
+    {
+      "title": "Disk Usage % by Region",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+      "targets": [{"expr": "(1 - (node_filesystem_avail_bytes{mountpoint=\"/\", region=~\"$region\"} / node_filesystem_size_bytes{mountpoint=\"/\", region=~\"$region\"})) * 100", "legendFormat": "{{region}} — {{hospital}}"}],
+      "fieldConfig": {"defaults": {"unit": "percent"}}
+    },
+    {
+      "title": "Billing Transactions",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+      "targets": [{"expr": "sum by (status, region) (rate(hospital_billing_transactions_total{region=~\"$region\"}[5m])) * 60", "legendFormat": "{{status}} — {{region}}"}],
+      "fieldConfig": {"defaults": {"unit": "reqpm"}}
+    },
+    {
+      "title": "Prescriptions Written",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+      "targets": [{"expr": "sum by (region) (rate(hospital_prescriptions_written_total{region=~\"$region\"}[5m])) * 60", "legendFormat": "{{region}}"}],
+      "fieldConfig": {"defaults": {"unit": "short"}}
+    }
+  ],
+  "schemaVersion": 38
+}
