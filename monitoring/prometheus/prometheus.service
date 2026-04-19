@@ -1,0 +1,15 @@
+[Unit]
+Description=Prometheus
+After=network.target
+
+[Service]
+User=root
+ExecStart=/usr/local/bin/prometheus \
+  --config.file=/etc/prometheus/prometheus.yml \
+  --storage.tsdb.path=/var/lib/prometheus \
+  --web.listen-address=:9090 \
+  --web.enable-lifecycle
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

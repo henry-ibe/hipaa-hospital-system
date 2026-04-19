@@ -1,0 +1,106 @@
+groups:
+  - name: hospital.availability
+    interval: 30s
+    rules:
+
+      - alert: HospitalAppDown
+        expr: up{job="hospital-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: sro
+        annotations:
+          summary: "Hospital app down in {{ $labels.region }}"
+          description: "{{ $labels.hospital }} has been unreachable for 1 minute."
+          runbook: "https://github.com/henry-ibe/hipaa-hospital-system/blob/master/docs/runbooks/HospitalAppDown.md"
+
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(hospital_api_requests_total{status_code=~"5.."}[5m])) by (region, hospital)
+          /
+          sum(rate(hospital_api_requests_total[5m])) by (region, hospital)
+          > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          team: sro
+        annotations:
+          summary: "Error rate >5% in {{ $labels.region }}"
+          description: "{{ $labels.hospital }} error rate is {{ $value | humanizePercentage }}."
+          runbook: "https://github.com/henry-ibe/hipaa-hospital-system/blob/master/docs/runbooks/HighErrorRate.md"
+
+      - alert: BedOccupancyCritical
+        expr: hospital_bed_occupancy_ratio > 0.95
+        for: 5m
+        labels:
+          severity: warning
+          team: sro
+        annotations:
+          summary: "Bed occupancy >95% in {{ $labels.department }}, {{ $labels.region }}"
+          description: "{{ $labels.hospital }} {{ $labels.department }} at {{ $value | humanizePercentage }} capacity."
+          runbook: "https://github.com/henry-ibe/hipaa-hospital-system/blob/master/docs/runbooks/BedOccupancyCritical.md"
+
+      - alert: DBConnectionPoolHigh
+        expr: hospital_db_connection_pool_usage > 0.85
+        for: 5m
+        labels:
+          severity: critical
+          team: sro
+        annotations:
+          summary: "DB pool >85% in {{ $labels.region }}"
+          description: "{{ $labels.hospital }} DB pool at {{ $value | humanizePercentage }}."
+          runbook: "https://github.com/henry-ibe/hipaa-hospital-system/blob/master/docs/runbooks/DBConnectionPoolHigh.md"
+
+      - alert: AuthFailureSpike
+        expr: sum(rate(hospital_auth_attempts_total{status="failed"}[5m])) by (region, hospital) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+          team: sro
+        annotations:
+          summary: "Auth failure spike in {{ $labels.region }}"
+          description: "Possible brute force on {{ $labels.hospital }}."
+          runbook: "https://github.com/henry-ibe/hipaa-hospital-system/blob/master/docs/runbooks/AuthFailureSpike.md"
+
+  - name: hospital.infrastructure
+    rules:
+
+      - alert: HighCPU
+        expr: |
+          100 - (avg by (region, hospital) (
+            rate(node_cpu_seconds_total{mode="idle"}[5m])
+          ) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+          team: sro
+        annotations:
+          summary: "High CPU in {{ $labels.region }}"
+          description: "CPU at {{ $value }}% on {{ $labels.hospital }}."
+          runbook: "https://github.com/henry-ibe/hipaa-hospital-system/blob/master/docs/runbooks/HighCPU.md"
+
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"}
+          / node_filesystem_size_bytes{mountpoint="/"}) < 0.15
+        for: 5m
+        labels:
+          severity: warning
+          team: sro
+        annotations:
+          summary: "Disk <15% free in {{ $labels.region }}"
+          description: "{{ $labels.hospital }} disk at {{ $value | humanizePercentage }} free."
+          runbook: "https://github.com/henry-ibe/hipaa-hospital-system/blob/master/docs/runbooks/DiskSpaceLow.md"
+
+      - alert: HighMemory
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes
+          / node_memory_MemTotal_bytes)) > 0.90
+        for: 5m
+        labels:
+          severity: critical
+          team: sro
+        annotations:
+          summary: "Memory >90% in {{ $labels.region }}"
+          description: "{{ $labels.hospital }} memory at {{ $value | humanizePercentage }}."
+          runbook: "https://github.com/henry-ibe/hipaa-hospital-system/blob/master/docs/runbooks/HighMemory.md"
