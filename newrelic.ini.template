@@ -1,0 +1,8 @@
+[newrelic]
+license_key = YOUR_NEW_RELIC_LICENSE_KEY
+app_name = Hospital Management System - TX
+monitor_mode = true
+log_level = info
+distributed_tracing.enabled = true
+transaction_tracer.enabled = true
+error_collector.enabled = true

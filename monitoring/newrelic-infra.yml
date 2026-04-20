@@ -1,0 +1,6 @@
+license_key: 3a9264ccb0092ec039ce3b940e38bba4f449NRAL
+display_name: hospital-app-tx
+custom_attributes:
+  region: tx
+  hospital: presbyterian
+  environment: production

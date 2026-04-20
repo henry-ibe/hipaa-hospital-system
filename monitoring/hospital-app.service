@@ -1,0 +1,18 @@
+[Unit]
+Description=Hospital App
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/home/ec2-user/hipaa-hospital-system
+Environment="HOSPITAL_REGION=tx"
+Environment="HOSPITAL_NAME=presbyterian"
+Environment="HOSPITAL_PROFILE=urban"
+Environment="SECRET_KEY=hospital-secret-key-change-in-prod"
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+Environment="NEW_RELIC_CONFIG_FILE=/home/ec2-user/hipaa-hospital-system/newrelic.ini"
+ExecStart=/usr/local/bin/newrelic-admin run-program /usr/local/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

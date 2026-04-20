@@ -1,0 +1,13 @@
+[Unit]
+Description=Hospital Traffic Simulator
+After=network.target
+
+[Service]
+User=root
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+ExecStart=/usr/bin/python3 /home/ec2-user/traffic-simulator.py
+WorkingDirectory=/home/ec2-user
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

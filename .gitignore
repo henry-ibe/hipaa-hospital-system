@@ -36,3 +36,5 @@ lambda-deployment-api/add_secrets.py
 node_modules/
 lambda-deployment-api/node_modules/
 *.tfstate*
+newrelic.ini
+response.json
