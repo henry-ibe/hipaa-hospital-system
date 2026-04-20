@@ -1,15 +1,27 @@
 global:
   resolve_timeout: 5m
+  slack_api_url: 'YOUR_SLACK_WEBHOOK_URL
 
 route:
   group_by: ['alertname', 'region', 'severity']
   group_wait: 10s
   group_interval: 10s
   repeat_interval: 1m
-  receiver: 'ntfy-bridge'
+  receiver: 'all-channels'
 
 receivers:
-  - name: 'ntfy-bridge'
+  - name: 'all-channels'
+    slack_configs:
+      - channel: '#sro-alerts'
+        send_resolved: true
+        title: '{{ if eq .Status "firing" }}FIRING{{ else }}RESOLVED{{ end }}: {{ .CommonAnnotations.summary }}'
+        text: |
+          *Alert:* {{ .CommonLabels.alertname }}
+          *Severity:* {{ .CommonLabels.severity }}
+          *Region:* {{ .CommonLabels.region }}
+          *Hospital:* {{ .CommonLabels.hospital }}
+          *Description:* {{ .CommonAnnotations.description }}
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
     webhook_configs:
       - url: 'http://localhost:5001/webhook'
         send_resolved: true
