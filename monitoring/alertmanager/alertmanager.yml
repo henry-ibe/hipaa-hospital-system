@@ -1,6 +1,6 @@
 global:
   resolve_timeout: 5m
-  slack_api_url: 'YOUR_SLACK_WEBHOOK_URL
+  slack_api_url: 'YOUR_SLACK_WEBHOOK_URL'
 
 route:
   group_by: ['alertname', 'region', 'severity']
@@ -24,6 +24,8 @@ receivers:
         color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
     webhook_configs:
       - url: 'http://localhost:5001/webhook'
+        send_resolved: true
+      - url: 'http://localhost:9000/webhook'
         send_resolved: true
 
 inhibit_rules:

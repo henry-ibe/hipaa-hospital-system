@@ -38,3 +38,8 @@ lambda-deployment-api/node_modules/
 *.tfstate*
 newrelic.ini
 response.json
+hospital-app-key.pem
+terraform.tfstate
+terraform.tfstate.backup
+*.pem
+newrelic.ini
